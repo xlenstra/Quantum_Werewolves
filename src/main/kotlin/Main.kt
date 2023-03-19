@@ -1,32 +1,41 @@
 import kotlinx.serialization.Serializable
-import kotlin.random.Random
+import logic.Action
+import logic.Role
+import logic.TargetedAction
+import logic.roleSetFromFile
 
 @Serializable
 data class Data(val a: Int, val b: String)
 
 fun main(args: Array<String>) {
-    val playerList = listOf("Xander", "Ruben", "Fenne", "Maries", "Theo", "Nina", "Arjan")
-//    val rolesList = listOf(Role.WEREWOLF, Role.WEREWOLF, Role.SEER, Role.VILLAGER, Role.VILLAGER, Role.VILLAGER, Role.VILLAGER)
+    val playerList = listOf("Xander", "Ruben", "Fenne", "Maries", "Theo", "Nina", "Arjan", "Bart", "Luc", "Max", "Alex")
+//    val rolesList = listOf(logic.Role.WEREWOLF, logic.Role.WEREWOLF, logic.Role.WEREWOLF, logic.Role.SEER, logic.Role.GUARDIAN, logic.Role.HAMSTER, logic.Role.SLUT, logic.Role.VILLAGER, logic.Role.VILLAGER, logic.Role.VILLAGER, logic.Role.VILLAGER)
 //
-//    val roleSet = RoleSet(1000, playerList, rolesList)
+//    val roleSet = logic.RoleSet(5000, playerList, rolesList)
 //
-//    roleSetToFile(roleSet, "test.json")
-
-
+//    logic.roleSetToFile(roleSet, "test.json")
+//
+//    return
 
     val roleSet = roleSetFromFile("test.json")
+    println(roleSet.possibleRolesWorlds.size)
 
-    var livingPlayers = playerList
+    val livingPlayers = playerList.toMutableList()
 
     while (roleSet.possibleRolesWorlds.size > 1 && livingPlayers.size > 1) {
-        val playerPercentages = roleSet.getPlayerPercentages(playerList)
-        val deadPercentage = roleSet.getDeathPercentages(playerList)
-        livingPlayers = playerList.filter { deadPercentage[it]!! != 1f }
+        val playerPercentages = roleSet.rolePercentagesOfAllPlayers(playerList)
+        val deadPercentage = roleSet.deathPercentageOfAllPlayers(playerList)
+        val quantumDeadPlayers = playerList.filter { deadPercentage[it]!! == 1f && it in livingPlayers}
+        if (quantumDeadPlayers.isNotEmpty())
+            println("Quantum dead players: $quantumDeadPlayers")
+        livingPlayers.removeAll(quantumDeadPlayers)
         if (livingPlayers.isEmpty()) break
         for (player in livingPlayers) {
             if (Role.WEREWOLF in playerPercentages[player]!!.keys) {
+                if (livingPlayers.size == 1)
+                    continue
                 val target = livingPlayers.filter { it != player }.random()
-                roleSet.executeAction(Action(action=Actions.EAT, performer=player, target=target))
+                roleSet.executeAction(TargetedAction(action= Action.EAT, performer=player, target=target))
                 println("$player eats $target")
             }
         }
@@ -36,10 +45,34 @@ fun main(args: Array<String>) {
                 roleSet.seePlayer(player, target)
             }
         }
+        for (player in livingPlayers) {
+            if (Role.GUARDIAN in playerPercentages[player]!!.keys) {
+                val target = livingPlayers.random()
+                roleSet.executeAction(TargetedAction(action= Action.GUARD, performer=player, target=target))
+                println("$player guards $target")
+            }
+        }
+        for (player in livingPlayers) {
+            if (Role.SLUT in playerPercentages[player]!!.keys) {
+                val target = livingPlayers.random()
+                roleSet.executeAction(TargetedAction(action= Action.SLUTS, performer = player, target=target))
+                println("$player spends the night at $target")
+            }
+        }
         val lynchTarget = livingPlayers.random()
         roleSet.lynchPlayer(lynchTarget)
+        livingPlayers.remove(lynchTarget)
+        val wolfPercentage = livingPlayers.sumOf { roleSet.rolePercentagesOfPlayer(it)[Role.WEREWOLF]?.toDouble() ?: 0.0 }
+        if (wolfPercentage == 0.0) {
+            println("The werewolves have been killed!")
+            break
+        }
     }
-    print(roleSet.possibleRolesWorlds[0])
+    println(livingPlayers)
+    println(roleSet.possibleRolesWorlds.size)
+    for (possibleWorld in roleSet.possibleRolesWorlds) {
+        println(possibleWorld.roleSet)
+    }
 }
 
 
