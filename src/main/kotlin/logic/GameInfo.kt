@@ -14,7 +14,7 @@ class GameInfo(val roleSet: RoleSet) {
 
     var isDay = true
 
-    fun executeLynchAction(player: String) {
+    fun lynchAndGoToNight(player: String) {
         nextPeriodInfo.clear()
         val lynchedPlayerInfo = roleSet.lynchPlayer(player)
         nextPeriodInfo.add(lynchedPlayerInfo)
@@ -65,11 +65,14 @@ class GameInfo(val roleSet: RoleSet) {
     }
 
     private fun checkQuantumDeaths() {
+        val playersToDie = mutableSetOf<String>()
         for (player in livingPlayers) {
-            if (roleSet.deathPercentageOfPlayer(player) == 0f) {
-                livingPlayers.remove(player)
+            if (roleSet.deathPercentageOfPlayer(player) == 1f) {
+                playersToDie.add(player)
                 nextPeriodInfo.add("$player died due to Quantum Effects")
             }
         }
+        // This is done to avoid ConcurrentModificationException
+        livingPlayers.removeAll(playersToDie)
     }
 }

@@ -1,7 +1,8 @@
 package UI.screens
 
+import UI.popup.Popup
+import UI.util.*
 import logic.GameInfo
-import UI.util.TabbedPager
 import com.badlogic.gdx.graphics.Color
 
 class DayScreen(gameInfo: GameInfo) : PickerScreen() {
@@ -30,5 +31,33 @@ class DayScreen(gameInfo: GameInfo) : PickerScreen() {
             PercentageOverview(gameInfo, this)
         )
         tabbedPager.selectPage(0)
+        
+        rightSideButton.setText("Lynch player and End Day")
+        rightSideButton.onClick {
+            val lynchPlayerPopup = LynchPlayerPopup(this, gameInfo)
+            lynchPlayerPopup.open()
+        }
+        rightSideButton.enable()
+    }
+}
+
+class LynchPlayerPopup(mainScreen: BaseScreen, private val gameInfo: GameInfo) : Popup(mainScreen) {
+    
+    init {
+        add("Wie wordt gelynchd?".toLabel()).pad(5f).row()
+        addSeparator().pad(10f)
+        for (playerName in gameInfo.livingPlayers) {
+            addLynchPlayerButton(playerName)
+        }
+        addCloseButton()
+    }
+    
+    private fun addLynchPlayerButton(playerName: String) {
+        addButton(playerName) {
+            gameInfo.lynchAndGoToNight(playerName)
+            QuantumWerewolfGame.Current.popScreen()
+            QuantumWerewolfGame.Current.pushScreen(DayScreen(gameInfo))
+            close()
+        }.fillX().row()
     }
 }

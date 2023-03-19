@@ -37,7 +37,7 @@ class PercentageOverview(private val gameInfo: GameInfo, mainScreen: BaseScreen)
         informationTable.add("Percentages:".toLabel(fontSize=Constants.headingFontSize)).pad(5f).row()
         val percentages = gameInfo.roleSet.rolePercentagesOfPlayer(player)
         for (role in percentages.keys) {
-            informationTable.add("${role.displayName}: ${100f-100f*percentages[role]!!}%".toLabel()).pad(5f).row()
+            informationTable.add("${role.displayName}: ${100f*percentages[role]!!}%".toLabel()).pad(5f).row()
         }
     }
 }
