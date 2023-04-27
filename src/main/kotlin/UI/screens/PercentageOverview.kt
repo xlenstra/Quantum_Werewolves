@@ -1,43 +1,48 @@
 package UI.screens
 
 import UI.util.*
+import UI.util.widgets.HorizontalTabber
+import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.scenes.scene2d.ui.Button
 import logic.GameInfo
-import com.badlogic.gdx.graphics.Color
-import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane
 import com.badlogic.gdx.scenes.scene2d.ui.Table
+import logic.Role
+import kotlin.math.roundToInt
 
-class PercentageOverview(private val gameInfo: GameInfo, mainScreen: BaseScreen) : Table() {
+class PercentageOverview(private val gameInfo: GameInfo, private val mainScreen: BaseScreen) {
 
-    private val playerChooseTable = Table()
-    private val informationTable = Table()
-
+    val contents: HorizontalTabber
+    
     init {
-        add(ScrollPane(playerChooseTable)).width(mainScreen.stage.width/3).grow()
-        addSeparatorVertical()
-        add(ScrollPane(informationTable)).width(mainScreen.stage.width/3*2).grow().pad(25f).row()
-        setPlayerChooseTable()
-    }
-
-    private fun setPlayerChooseTable() {
-        playerChooseTable.clear()
-        for (player in gameInfo.players) {
-            val playerButton = player.toTextButton()
-            playerButton.onClick {
-                setInformationForPlayer(player)
-            }
-            playerChooseTable.add(playerButton).pad(10f).row()
+        contents = HorizontalTabber(mainScreen, gameInfo.players.toList()) { player, _ ->
+            getInformationForPlayer(player)
         }
     }
-
-    private fun setInformationForPlayer(player: String) {
-        informationTable.clear()
+    
+    private fun getInformationForPlayer(player: String): Table {
+        val informationTable = Table()
         informationTable.add(player.toLabel(fontSize=Constants.headingFontSize)).pad(10f).row()
         informationTable.add("${100f-100f*gameInfo.roleSet.deathPercentageOfPlayer(player)}% alive".toLabel()).pad(5f).row()
         informationTable.addSeparator().pad(10f)
         informationTable.add("Percentages:".toLabel(fontSize=Constants.headingFontSize)).pad(5f).row()
         val percentages = gameInfo.roleSet.rolePercentagesOfPlayer(player)
-        for (role in percentages.keys) {
+        for (role in percentages.keys.sorted()) {
             informationTable.add("${role.displayName}: ${100f*percentages[role]!!}%".toLabel()).pad(5f).row()
         }
+        informationTable.add(copyPercentagesToClipboard(percentages)).pad(10f).row()
+        return informationTable
+    }
+    
+    private fun copyPercentagesToClipboard(percentages: Map<Role, Float>): Button {
+        val copyButton = "Copy role percentages to clipboard".toTextButton()
+        copyButton.onClick {
+            val percentagesString = percentages.map { "${it.key.displayName}\t${(100f * it.value).roundToInt()}%" }.joinToString("\n")
+            Gdx.app.clipboard.contents = percentagesString
+        }
+        return copyButton
+    }
+
+    fun update() {
+        contents.update()
     }
 }

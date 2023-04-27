@@ -1,6 +1,6 @@
 package UI.util
 
-import logic.RoleSet
+import UI.Log.debug
 import UI.saving.CustomFileLocationHelper
 import UI.saving.Gzip
 import UI.saving.fromJsonFile
@@ -9,6 +9,10 @@ import com.badlogic.gdx.Files
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.files.FileHandle
 import com.badlogic.gdx.utils.SerializationException
+import kotlinx.coroutines.Job
+import logic.BackwardsCompatibility.fixOldBugs
+import logic.GameInfo
+import logic.GameInfoPreview
 import java.io.File
 import java.io.Writer
 
@@ -30,6 +34,7 @@ class QuantumFiles(
     }
     //region Data
 
+    var autoSaveJob: Job? = null
 
     //endregion
     //region Helpers
@@ -100,14 +105,6 @@ class QuantumFiles(
     }
 
     /**
-     * @return `true` if successful.
-     * @throws SecurityException when delete access was denied
-     */
-    fun deleteMultiplayerSave(gameName: String): Boolean {
-        return deleteSave(getMultiplayerSave(gameName))
-    }
-
-    /**
      * Only use this with a [FileHandle] obtained by one of the methods of this class!
      *
      * @return `true` if successful.
@@ -129,46 +126,46 @@ class QuantumFiles(
     //endregion
     //region Saving
 
-//    fun saveGame(game: logic.GameInfo, GameName: String, saveCompletionCallback: (Exception?) -> Unit = { if (it != null) throw it }): FileHandle {
-//        val file = getSave(GameName)
-//        saveGame(game, file, saveCompletionCallback)
-//        return file
-//    }
+    fun saveGame(game: GameInfo, GameName: String, saveCompletionCallback: (Exception?) -> Unit = { if (it != null) throw it }): FileHandle {
+        val file = getSave(GameName)
+        saveGame(game, file, saveCompletionCallback)
+        return file
+    }
 
     /**
      * Only use this with a [FileHandle] obtained by one of the methods of this class!
      */
-//    fun saveGame(game: logic.GameInfo, file: FileHandle, saveCompletionCallback: (Exception?) -> Unit = { if (it != null) throw it }) {
-//        try {
-//            debug("Saving logic.GameInfo %s to %s", game.gameId, file.path())
-//            file.writeString(gameInfoToString(game), false)
-//            saveCompletionCallback(null)
-//        } catch (ex: Exception) {
-//            saveCompletionCallback(ex)
-//        }
-//    }
+    fun saveGame(game: GameInfo, file: FileHandle, saveCompletionCallback: (Exception?) -> Unit = { if (it != null) throw it }) {
+        try {
+            debug("Saving game to %s", file.path())
+            file.writeString(gameInfoToString(game), false)
+            saveCompletionCallback(null)
+        } catch (ex: Exception) {
+            saveCompletionCallback(ex)
+        }
+    }
 
     /**
      * Overload of function saveGame to save a GameInfoPreview in the MultiplayerGames folder
      */
-//    fun saveGame(game: GameInfoPreview, gameName: String, saveCompletionCallback: (Exception?) -> Unit = { if (it != null) throw it }): FileHandle {
-//        val file = getMultiplayerSave(gameName)
-//        saveGame(game, file, saveCompletionCallback)
-//        return file
-//    }
+    fun saveGame(game: GameInfoPreview, gameName: String, saveCompletionCallback: (Exception?) -> Unit = { if (it != null) throw it }): FileHandle {
+        val file = getMultiplayerSave(gameName)
+        saveGame(game, file, saveCompletionCallback)
+        return file
+    }
 
     /**
      * Only use this with a [FileHandle] obtained by one of the methods of this class!
      */
-//    fun saveGame(game: GameInfoPreview, file: FileHandle, saveCompletionCallback: (Exception?) -> Unit = { if (it != null) throw it }) {
-//        try {
-//            debug("Saving GameInfoPreview %s to %s", game.gameId, file.path())
-//            json().toJson(game, file)
-//            saveCompletionCallback(null)
-//        } catch (ex: Exception) {
-//            saveCompletionCallback(ex)
-//        }
-//    }
+    fun saveGame(game: GameInfoPreview, file: FileHandle, saveCompletionCallback: (Exception?) -> Unit = { if (it != null) throw it }) {
+        try {
+            debug("Saving game to %s", file.path())
+            json().toJson(game, file)
+            saveCompletionCallback(null)
+        } catch (ex: Exception) {
+            saveCompletionCallback(ex)
+        }
+    }
 
     class CustomSaveResult(
         override val location: String? = null,
@@ -181,22 +178,22 @@ class QuantumFiles(
      *
      * Calls the [saveCompleteCallback] on the main thread with the save location on success, an [Exception] on error, or both null on cancel.
      */
-//    fun saveGameToCustomLocation(game: logic.GameInfo, gameName: String, saveCompletionCallback: (CustomSaveResult) -> Unit) {
-//        val saveLocation = game.customSaveLocation ?: Gdx.files.local(gameName).path()
-//        val gameData = try {
-//            gameInfoToString(game)
-//        } catch (ex: Exception) {
-//            Concurrency.runOnGLThread { saveCompletionCallback(CustomSaveResult(exception = ex)) }
-//            return
-//        }
-//        debug("Saving logic.GameInfo %s to custom location %s", game.gameId, saveLocation)
-//        customFileLocationHelper!!.saveGame(gameData, saveLocation) {
-//            if (it.isSuccessful()) {
-//                game.customSaveLocation = it.location
-//            }
-//            saveCompletionCallback(it)
-//        }
-//    }
+    fun saveGameToCustomLocation(game: GameInfo, gameName: String, saveCompletionCallback: (CustomSaveResult) -> Unit) {
+        val saveLocation = game.customSaveLocation ?: Gdx.files.local(gameName).path()
+        val gameData = try {
+            gameInfoToString(game)
+        } catch (ex: Exception) {
+            Concurrency.runOnGLThread { saveCompletionCallback(CustomSaveResult(exception = ex)) }
+            return
+        }
+        debug("Saving game to custom location %s", saveLocation)
+        customFileLocationHelper!!.saveGame(gameData, saveLocation) {
+            if (it.isSuccessful()) {
+                game.customSaveLocation = it.location
+            }
+            saveCompletionCallback(it)
+        }
+    }
 
     //endregion
     //region Loading
@@ -204,12 +201,23 @@ class QuantumFiles(
     fun loadGameByName(gameName: String) =
         loadGameFromFile(getSave(gameName))
 
-    fun loadGameFromFile(gameFile: FileHandle): RoleSet {
+    fun loadGameFromFile(gameFile: FileHandle): GameInfo {
         val gameData = gameFile.readString()
         if (gameData.isNullOrBlank()) {
             throw emptyFile(gameFile)
         }
         return gameInfoFromString(gameData)
+    }
+
+    fun loadGamePreviewByName(gameName: String) =
+        loadGamePreviewFromFile(getMultiplayerSave(gameName))
+
+    fun loadGamePreviewFromFile(gameFile: FileHandle): GameInfoPreview {
+        val preview = json().fromJson(GameInfoPreview::class.java, gameFile)
+        if (preview == null) {
+            throw emptyFile(gameFile)
+        }
+        return preview
     }
 
 
@@ -235,24 +243,24 @@ class QuantumFiles(
      *
      * The exception may be [IncompatibleGameInfoVersionException] if the [gameData] was created by a version of this game that is incompatible with the current one.
      */
-//    fun loadGameFromCustomLocation(loadCompletionCallback: (CustomLoadResult<logic.RoleSet>) -> Unit) {
-//        customFileLocationHelper!!.loadGame { result ->
-//            val location = result.location
-//            val gameData = result.gameData
-//            if (location == null || gameData == null) {
-//                loadCompletionCallback(CustomLoadResult(exception = result.exception))
-//                return@loadGame
-//            }
-//
-//            try {
-//                val gameInfo = gameInfoFromString(gameData)
-//                gameInfo.customSaveLocation = location
-//                loadCompletionCallback(CustomLoadResult(location to gameInfo))
-//            } catch (ex: Exception) {
-//                loadCompletionCallback(CustomLoadResult(exception = ex))
-//            }
-//        }
-//    }
+    fun loadGameFromCustomLocation(loadCompletionCallback: (CustomLoadResult<GameInfo>) -> Unit) {
+        customFileLocationHelper!!.loadGame { result ->
+            val location = result.location
+            val gameData = result.gameData
+            if (location == null || gameData == null) {
+                loadCompletionCallback(CustomLoadResult(exception = result.exception))
+                return@loadGame
+            }
+
+            try {
+                val gameInfo = gameInfoFromString(gameData)
+                gameInfo.customSaveLocation = location
+                loadCompletionCallback(CustomLoadResult(location to gameInfo))
+            } catch (ex: Exception) {
+                loadCompletionCallback(CustomLoadResult(exception = ex))
+            }
+        }
+    }
 
 
     //endregion
@@ -304,23 +312,24 @@ class QuantumFiles(
         }
 
         /** @throws IncompatibleGameInfoVersionException if the [gameData] was created by a version of this game that is incompatible with the current one. */
-        fun gameInfoFromString(gameData: String): RoleSet {
+        fun gameInfoFromString(gameData: String): GameInfo {
             val unzippedJson = try {
                 Gzip.unzip(gameData)
             } catch (ex: Exception) {
                 gameData
             }
             val gameInfo = try {
-                json().fromJson(RoleSet::class.java, unzippedJson)
+                json().fromJson(GameInfo::class.java, unzippedJson)
             } catch (ex: Exception) {
-                println("Exception while deserializing logic.GameInfo JSON")
+                println("Exception while deserializing GameInfo JSON")
                 throw(ex)
             }
+            gameInfo.fixOldBugs()
             return gameInfo
         }
 
         /** Returns gzipped serialization of [game], optionally gzipped ([forceZip] overrides [saveZipped]) */
-        fun gameInfoToString(game: RoleSet, forceZip: Boolean? = null): String {
+        fun gameInfoToString(game: GameInfo, forceZip: Boolean? = null): String {
             val plainJson = json().toJson(game)
             return if (forceZip ?: saveZipped) Gzip.zip(plainJson) else plainJson
         }
@@ -329,61 +338,61 @@ class QuantumFiles(
     //endregion
     //region Autosave
 
-//    /**
-//     * Auto-saves a snapshot of the [gameInfo] in a new thread.
-//     */
-//    fun requestAutoSave(gameInfo: logic.GameInfo): Job {
-//        // The save takes a long time (up to a few seconds on large games!) and we can do it while the player continues his game.
-//        // On the other hand if we alter the game data while it's being serialized we could get a concurrent modification exception.
-//        // So what we do is we clone all the game data and serialize the clone.
-//        return requestAutoSaveUnCloned(gameInfo.clone())
-//    }
-//
-//    /**
-//     * In a new thread, auto-saves the [gameInfo] directly - only use this with [logic.GameInfo] objects that are guaranteed not to be changed while the autosave is in progress!
-//     */
-//    fun requestAutoSaveUnCloned(gameInfo: logic.GameInfo): Job {
-//        val job = Concurrency.run("autoSaveUnCloned") {
-//            autoSave(gameInfo)
-//        }
-//        autoSaveJob = job
-//        return job
-//    }
-//
-//    fun autoSave(gameInfo: logic.GameInfo) {
-//        try {
-//            saveGame(gameInfo, AUTOSAVE_FILE_NAME)
-//        } catch (oom: OutOfMemoryError) {
-//            return  // not much we can do here
-//        }
-//
-//        // keep auto-saves for the last 10 turns for debugging purposes
-//        val newAutosaveFilename =
-//            SAVE_FILES_FOLDER + File.separator + AUTOSAVE_FILE_NAME + "-${gameInfo.currentPlayer}-${gameInfo.turns}"
-//        getSave(AUTOSAVE_FILE_NAME).copyTo(files.local(newAutosaveFilename))
-//
-//        fun getAutosaves(): Sequence<FileHandle> {
-//            return getSaves().filter { it.name().startsWith(AUTOSAVE_FILE_NAME) }
-//        }
-//        while (getAutosaves().count() > 10) {
-//            val saveToDelete = getAutosaves().minByOrNull { it.lastModified() }!!
-//            deleteSave(saveToDelete.name())
-//        }
-//    }
-//
-//    fun loadLatestAutosave(): logic.GameInfo {
-//        try {
-//            return loadGameByName(AUTOSAVE_FILE_NAME)
-//        } catch (ex: Exception) {
-//            // silent fail if we can't read the autosave for any reason - try to load the last autosave by turn number first
-//            val autosaves = getSaves().filter { it.name() != AUTOSAVE_FILE_NAME && it.name().startsWith(AUTOSAVE_FILE_NAME) }
-//            return loadGameFromFile(autosaves.maxByOrNull { it.lastModified() }!!)
-//        }
-//    }
-//
-//    fun autosaveExists(): Boolean {
-//        return getSave(AUTOSAVE_FILE_NAME).exists()
-//    }
+    /**
+     * Auto-saves a snapshot of the [gameInfo] in a new thread.
+     */
+    fun requestAutoSave(gameInfo: GameInfo): Job {
+        // The save takes a long time (up to a few seconds on large games!) and we can do it while the player continues his game.
+        // On the other hand if we alter the game data while it's being serialized we could get a concurrent modification exception.
+        // So what we do is we clone all the game data and serialize the clone.
+        return requestAutoSaveUnCloned(gameInfo/*.clone()*/)
+    }
+
+    /**
+     * In a new thread, auto-saves the [gameInfo] directly - only use this with [GameInfo] objects that are guaranteed not to be changed while the autosave is in progress!
+     */
+    fun requestAutoSaveUnCloned(gameInfo: GameInfo): Job {
+        val job = Concurrency.run("autoSaveUnCloned") {
+            autoSave(gameInfo)
+        }
+        autoSaveJob = job
+        return job
+    }
+
+    fun autoSave(gameInfo: GameInfo) {
+        try {
+            saveGame(gameInfo, AUTOSAVE_FILE_NAME)
+        } catch (oom: OutOfMemoryError) {
+            return  // not much we can do here
+        }
+
+        // keep auto-saves for the last 10 turns for debugging purposes
+        val newAutosaveFilename =
+            SAVE_FILES_FOLDER + File.separator + AUTOSAVE_FILE_NAME + "- ${gameInfo.gameName} - ${if (gameInfo.isDay) "day" else "night"} ${gameInfo.dayCounter}"
+        getSave(AUTOSAVE_FILE_NAME).copyTo(files.local(newAutosaveFilename))
+
+        fun getAutoSaves(): Sequence<FileHandle> {
+            return getSaves().filter { it.name().startsWith(AUTOSAVE_FILE_NAME) }
+        }
+        while (getAutoSaves().count() > 10) {
+            val saveToDelete = getAutoSaves().minByOrNull { it.lastModified() }!!
+            deleteSave(saveToDelete.name())
+        }
+    }
+
+    fun loadLatestAutosave(): GameInfo {
+        try {
+            return loadGameByName(AUTOSAVE_FILE_NAME)
+        } catch (ex: Exception) {
+            // silent fail if we can't read the autosave for any reason - try to load the last autosave by turn number first
+            val autosaves = getSaves().filter { it.name() != AUTOSAVE_FILE_NAME && it.name().startsWith(AUTOSAVE_FILE_NAME) }
+            return loadGameFromFile(autosaves.maxByOrNull { it.lastModified() }!!)
+        }
+    }
+
+    fun autosaveExists(): Boolean {
+        return getSave(AUTOSAVE_FILE_NAME).exists()
+    }
 
     // endregion
 }

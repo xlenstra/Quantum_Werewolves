@@ -6,14 +6,18 @@ import logic.RoleSet
 import QuantumWerewolfGame
 import UI.popup.Popup
 import UI.util.*
+import UI.util.widgets.AutoScrollPane
+import UI.util.widgets.QWSlider
+import UI.util.widgets.UncivTextField
 import com.badlogic.gdx.graphics.Color
-import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane
 import com.badlogic.gdx.scenes.scene2d.ui.Table
+import com.badlogic.gdx.scenes.scene2d.ui.TextField
 import com.badlogic.gdx.utils.Align
 import com.unciv.ui.popup.AskTextPopup
+import logic.GameSetupInfo
 
 
-class NewGameScreen : PickerScreen() {
+class NewGameScreen(defaultOptions: GameSetupInfo? = null) : PickerScreen() {
 
     private val optionsTable = GameOptionsColumn()
     private val playerTable = PlayerColumn(this)
@@ -29,62 +33,76 @@ class NewGameScreen : PickerScreen() {
         topTable.add("Select Roles".toLabel(fontSize = Constants.headingFontSize)).pad(20f, 0f)
         topTable.addSeparator(Color.CLEAR, height = 1f)
 
-        topTable.add(ScrollPane(optionsTable)
+        topTable.add(AutoScrollPane(optionsTable)
             .apply { setOverscroll(false, false) })
             .width(stage.width / 3).top()
+            .growY()
         topTable.addSeparatorVertical(Color.CLEAR, 1f)
-        topTable.add(ScrollPane(playerTable)
-            .apply { setOverscroll(false, false) })
+        topTable.add(AutoScrollPane(playerTable)
+            .apply { setOverscroll(false, true) })
             .width(stage.width / 3).top()
+            .growY()
         topTable.addSeparatorVertical(Color.CLEAR, 1f)
-        topTable.add(rolesTable)  // No ScrollPane, PlayerPickerTable has its own
+        topTable.add(AutoScrollPane(rolesTable)
+            .apply { setOverscroll(false, true) })
             .width(stage.width / 3).top()
+            .growY()
 
+        if (defaultOptions != null) {
+            optionsTable.worldCount = defaultOptions.worldCount
+            optionsTable.textField.text = defaultOptions.gameName
+            playerTable.players.addAll(defaultOptions.players)
+            rolesTable.roles.addAll(defaultOptions.roles)
+            playerTable.update()
+            rolesTable.update()
+        }
+        
         setDefaultCloseAction()
 
         pick("Start Game")
         rightSideButton.onClick {
             QuantumWerewolfGame.Current.popScreen()
             val roleSet = RoleSet(optionsTable.worldCount, playerTable.players, rolesTable.roles)
-            QuantumWerewolfGame.Current.gameInfo = GameInfo(roleSet)
-            QuantumWerewolfGame.Current.pushScreen(DayScreen(QuantumWerewolfGame.Current.gameInfo!!))
-//            val game = Game()
-//            game.players = playerTable.players
-//            game.start()
-//            game.setScreen<GameScreen>()
+            QuantumWerewolfGame.Current.gameInfo = GameInfo(roleSet, optionsTable.textField.text)
+            QuantumWerewolfGame.Current.pushScreen(GameScreen(QuantumWerewolfGame.Current.gameInfo!!))
         }
     }
 
     fun tryEnableStartGameButton() {
 
-        @Suppress("SENSELESS_COMPARISON") // Because of the way the game is initialized, these can be null
+        @Suppress("SENSELESS_COMPARISON") // Because of the way the game is initialized, these can somehow be null
         if (playerTable == null || rolesTable == null) return
         val enoughPlayers = Constants.minPlayerCount <= playerTable.players.count()
         val enoughRoles = playerTable.players.count() == rolesTable.roles.count()
         setRightSideButtonEnabled(enoughPlayers && enoughRoles)
     }
-
-    fun getPlayers() = playerTable.players
-    fun getRoles() = rolesTable.roles
 }
 
 private class GameOptionsColumn(): Table() {
 
     var worldCount = 100
-
+    lateinit var textField: TextField
+    
     init {
         pad(10f)
+        addGameNameTextField()
         addWorldSlider()
+    }
+    
+    private fun addGameNameTextField() {
+        textField = UncivTextField.create("Game Name")
+        add("Game Name:".toLabel()).left().growX()
+        add(textField).pad(10f).row()
     }
 
     private fun addWorldSlider() {
         add("Amount of worlds:".toLabel()).left().expandX()
-        val slider = QWSlider(100f, 10000f, 50f, initial = worldCount.toFloat()) {
+        val slider = QWSlider(100f, 25000f, 50f, initial = worldCount.toFloat(), logarithmic = true) {
             worldCount = it.toInt()
         }
         slider.permanentTip = true
-        val snapValues = floatArrayOf(100f,250f,500f,1000f,1500f,2500f,5000f,7500f,10000f)
-        slider.setSnapToValues(snapValues, 250f)
+        val snapValues = floatArrayOf(100f, 500f, 1000f, 1500f, 2500f, 5000f, 7500f, 10000f, 25000f)
+        slider.setSnapToValues(snapValues, 150f)
         add(slider).padTop(10f).row()
     }
 }
@@ -171,7 +189,7 @@ private class PlayerColumn(private val mainScreen: BaseScreen) : Table() {
 private class RoleColumn(private val mainScreen: BaseScreen) : Table() {
 
     val roles = mutableListOf<Role>()
-    val civBlocksWidth = mainScreen.stage.width / 3
+    val civBlocksWidth = mainScreen.stage.width / 3 - 10f
 
     init {
         defaults().pad(10f)

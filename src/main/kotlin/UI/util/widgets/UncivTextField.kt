@@ -1,5 +1,6 @@
-package UI.util
+package UI.util.widgets
 
+import UI.util.*
 import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.scenes.scene2d.Actor
 import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane

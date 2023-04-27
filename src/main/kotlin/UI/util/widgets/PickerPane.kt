@@ -1,6 +1,7 @@
-package UI.util
+package UI.util.widgets
 // Adapted from unciv, the civ-V clone by Yairm210
 
+import UI.util.*
 import com.badlogic.gdx.scenes.scene2d.Actor
 import com.badlogic.gdx.scenes.scene2d.ui.Button
 import com.badlogic.gdx.scenes.scene2d.ui.SplitPane

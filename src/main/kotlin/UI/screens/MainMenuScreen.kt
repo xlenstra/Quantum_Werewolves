@@ -1,9 +1,11 @@
 package UI.screens
 
-import QuantumWerewolfGame
 import UI.images.ImageGetter
+import UI.saving.AutoSave
+import UI.saving.LoadGameScreen
 import UI.util.*
 import UI.util.BaseScreen.Companion.skinStrings
+import UI.util.widgets.AutoScrollPane
 import com.badlogic.gdx.scenes.scene2d.Touchable
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 
@@ -34,19 +36,17 @@ private fun getMenuButton(
     return table
 }
 
-class MainMenuScreen(game: QuantumWerewolfGame) : BaseScreen() {
-
-    val scrollPane: AutoScrollPane
+class MainMenuScreen() : BaseScreen() {
 
     init {
-        scrollPane = AutoScrollPane("New Game".toTextButton())
-
         val column1 = Table().apply { defaults().pad(10f).fillX() }
         val column2 = Table().apply { defaults().pad(10f).fillX() }
 
-//        val resumeTable = getMenuButton("Resume","OtherIcons/Resume")
-//        { }
-//        column1.add(resumeTable).row()
+        if (game.files.autosaveExists() || game.gameInfo != null) {
+            val resumeTable = getMenuButton("Resume", "OtherIcons/Resume")
+            { resumeGame() }
+            column2.add(resumeTable).row()
+        }
 
 //        val quickstartTable = getMenuButton("Quickstart", "OtherIcons/Quickstart")
 //        { }
@@ -58,7 +58,7 @@ class MainMenuScreen(game: QuantumWerewolfGame) : BaseScreen() {
 
         if (game.files.getSaves().any()) {
             val loadGameTable = getMenuButton("Load game", "OtherIcons/Load")
-            { game.pushScreen(this) }
+            { game.pushScreen(LoadGameScreen()) }
             column2.add(loadGameTable).row()
         }
 
@@ -77,5 +77,14 @@ class MainMenuScreen(game: QuantumWerewolfGame) : BaseScreen() {
         stage.addActor(scrollPane)
         table.center(scrollPane)
 
+    }
+
+    private fun resumeGame() {
+        if (game.gameScreen != null) {
+            game.resetToGameScreen()
+//            curWorldScreen.popups.filterIsInstance(WorldScreenMenuPopup::class.java).forEach(Popup::close)
+        } else {
+            AutoSave.autoLoadGame(this)
+        }
     }
 }

@@ -1,0 +1,48 @@
+package UI.screens
+
+import UI.popup.PickOptionPopup
+import UI.util.*
+import UI.util.widgets.HorizontalTabber
+import com.badlogic.gdx.scenes.scene2d.ui.Table
+import logic.GameInfo
+
+class ActionScreen(private val gameInfo: GameInfo, private val mainScreen: BaseScreen) {
+
+    val contents: HorizontalTabber
+    
+    init {
+        contents = HorizontalTabber(mainScreen, gameInfo.players.toList()) { player, _ ->
+            createActionListFor(player)
+        }
+    }
+    
+    private fun createActionListFor(player: String): Table {
+        val actionTable = Table(BaseScreen.skin)
+        actionTable.add(player.toLabel(fontSize=Constants.headingFontSize)).pad(10f).row()
+        actionTable.addSeparator().pad(10f)
+        actionTable.add("Actions:".toLabel(fontSize=Constants.headingFontSize)).pad(5f).row()
+        val roles = gameInfo.roleSet.rolePercentagesOfPlayer(player).keys.sorted()
+        for (role in roles) {
+            for (action in role.mapToActions()) {
+                if (!gameInfo.playerCanPreformAction(player, action)) continue
+                
+                actionTable.add("${role.displayName} $player ${action.displayName.lowercase()}:".toLabel()).pad(5f)
+                val target = gameInfo.nightActions.getAction(player, action) ?: "Select"
+                val changeTargetButton = target.toTextButton()
+                changeTargetButton.onClick {
+                    PickOptionPopup(mainScreen, gameInfo.livingPlayers.toList(), "Select target for $action") { target ->
+                        gameInfo.nightActions.setAction(player, action, target)
+                        changeTargetButton.label = target.toLabel()
+                        update(player)
+                    }.open()
+                }
+                actionTable.add(changeTargetButton).row()
+            }
+        }
+        return actionTable
+    }
+    
+    fun update(defaultSelection: String? = null) {
+        contents.update(defaultSelection)
+    }
+}

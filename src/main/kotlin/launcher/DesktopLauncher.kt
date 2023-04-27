@@ -26,7 +26,6 @@ import javax.swing.JFrame
 
 
 internal object DesktopLauncher {
-    private var discordTimer: Timer? = null
 
     @JvmStatic
     fun main(arg: Array<String>) {

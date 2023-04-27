@@ -1,4 +1,4 @@
-package UI.util
+package UI.util.widgets
 
 import UI.wrapCrashHandling
 import UI.wrapCrashHandlingUnit

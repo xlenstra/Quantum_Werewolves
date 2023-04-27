@@ -1,6 +1,8 @@
 package UI.popup
 
 import UI.util.*
+import UI.util.widgets.AutoScrollPane
+import UI.util.widgets.QWStage
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.math.Rectangle
 import com.badlogic.gdx.scenes.scene2d.Actor

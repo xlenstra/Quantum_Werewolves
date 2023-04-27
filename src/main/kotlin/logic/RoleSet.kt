@@ -1,127 +1,34 @@
 package logic
 
+import UI.util.toRole
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import java.io.File
-
-enum class Role(val displayName: String) {
-    WEREWOLF("Weerwolf"),
-    VILLAGER("Burger"),
-    SEER("Ziener"),
-    GUARDIAN("Beschermengel"),
-    HAMSTER("Weerhamster"),
-    SLUT("Slet"),
-}
 
 @Serializable
-data class RolesWorld(val roleSet: Map<String, Role>) {
+class RoleSet() {
 
-    private val werewolfOrder: List<String> =
-        roleSet.filter { it.value == Role.WEREWOLF }.keys.shuffled()
-    val livingPlayers = roleSet.keys.toMutableList()
-    var worldIsPossible = true
-
-    private val worldNightActions = WorldNightActions()
-
-    private fun actionApplies(action: TargetedAction): Boolean {
-        if (action.action == Action.LYNCH) return true
-        if (action.performer !in livingPlayers) return false
-
-        val role = roleSet[action.performer]!!
-        return when (action.action) {
-            Action.EAT -> role == Role.WEREWOLF
-            Action.SEE -> role == Role.SEER
-            Action.GUARD -> role == Role.GUARDIAN
-            Action.SLUTS -> role == Role.SLUT
-            else -> true
-        }
-    }
-
-    private fun getHighestLivingWerewolf(): String {
-        return werewolfOrder.first { it in livingPlayers }
-    }
-
-    fun applyAction(action: TargetedAction) {
-        if (!actionApplies(action)) return
-        when (action.action) {
-            Action.LYNCH -> {
-                if (action.target !in livingPlayers)
-                    worldIsPossible = false
-                if (roleSet[action.target] != action.targetRole) {
-                    worldIsPossible = false
-                }
-                livingPlayers.remove(action.target)
-            }
-            Action.EAT -> {
-                if (werewolfOrder.none { it in livingPlayers }) {
-                    println("Panic!")
-                }
-                if (action.performer == getHighestLivingWerewolf()) {
-                    worldNightActions.wolfTarget = action.target
-                    worldNightActions.killWolf = action.performer
-                }
-            }
-            Action.SEE -> {
-                // If the target is already dead, we don't need to do anything here
-                if (action.targetRole == null) return
-                if (roleSet[action.target] != action.targetRole) {
-                    worldIsPossible = false
-                }
-                if (action.targetRole == Role.HAMSTER) {
-                    livingPlayers.remove(action.target)
-                }
-            }
-            Action.GUARD -> {
-                worldNightActions.guardedPlayers.add(action.target!!)
-            }
-            Action.SLUTS -> {
-                worldNightActions.guardedPlayers.add(action.performer!!)
-                worldNightActions.sleepsAt[action.performer] = action.target!!
-            }
-            Action.FINISH_NIGHT -> {
-                for (player in livingPlayers) {
-                    if (roleSet[player] == Role.HAMSTER) {
-                        worldNightActions.guardedPlayers.add(player)
-                    }
-                }
-                if (worldNightActions.wolfTarget != null && worldNightActions.wolfTarget !in worldNightActions.guardedPlayers) {
-                    livingPlayers.remove(worldNightActions.wolfTarget)
-                    for ((guest, house) in worldNightActions.sleepsAt) {
-                        if (house == worldNightActions.wolfTarget) {
-                            livingPlayers.remove(guest)
-                        }
-                    }
-                }
-                worldNightActions.reset()
-            }
-        }
-    }
-}
-
-@Serializable
-class RoleSet {
-
-    var startingRolesWorlds: List<RolesWorld> = listOf()
-    var possibleRolesWorlds: List<RolesWorld> = listOf()
+    var possibleRoleWorlds: List<World> = listOf()
 
     var actionList = mutableListOf<TargetedAction>()
     var playerList = listOf<String>()
+    
+    var startingWorldCount = 100
 
-    constructor(worldCount: Int, players: List<String>, roleList: List<Role>) {
-        val tempList = mutableListOf<RolesWorld>()
+    constructor(worldCount: Int, players: List<String>, roleList: List<Role>) : this() {
+        startingWorldCount = worldCount
+        
+        val tempList = mutableListOf<World>()
         playerList = players
-        repeat(worldCount) {
+        repeat(worldCount) { index ->
             val shuffledRoles = roleList.shuffled()
             val roleSet = players.zip(shuffledRoles).toMap()
-            val world = RolesWorld(roleSet)
+            val world = World(roleSet, index)
             if (world !in tempList)
                 tempList.add(world)
         }
-        startingRolesWorlds = tempList
-        possibleRolesWorlds = startingRolesWorlds
+        possibleRoleWorlds = tempList
     }
+    
+    // region percentages
 
     fun rolePercentagesOfAllPlayers(players: List<String>): Map<String, Map<Role, Float>> {
         val playerMap = mutableMapOf<String, Map<Role, Float>>()
@@ -131,70 +38,111 @@ class RoleSet {
         return playerMap
     }
 
+    /**
+     * Returns a map of roles to the percentage of worlds in which the player has that role
+     * If a player is a certain role in no worlds, the role will not be in the map 
+     */
     fun rolePercentagesOfPlayer(player: String): Map<Role, Float> {
         val roleCount = mutableMapOf<Role, Int>()
-        for (world in possibleRolesWorlds) {
+        for (world in possibleRoleWorlds) {
             if (player !in world.livingPlayers) continue
-            val role = world.roleSet[player]!!
+            val role = world.roleSet[player]!!.toRole()
             roleCount[role] = roleCount.getOrDefault(role, 0) + 1
         }
-        return roleCount.mapValues { it.value.toFloat() / possibleRolesWorlds.count { player in it.livingPlayers } }
+        return roleCount.mapValues { it.value.toFloat() / possibleRoleWorlds.count { player in it.livingPlayers } }
     }
 
     fun deathPercentageOfAllPlayers(players: List<String>): Map<String, Float> =
         players.associateWith { deathPercentageOfPlayer(it) }
 
     fun deathPercentageOfPlayer(player: String): Float {
-        val deathCount = possibleRolesWorlds.count { !it.livingPlayers.contains(player) }
-        return deathCount.toFloat() / possibleRolesWorlds.size
+        val deathCount = possibleRoleWorlds.count { !it.livingPlayers.contains(player) }
+        return deathCount.toFloat() / possibleRoleWorlds.size
     }
+    
+    // endregion
+    // region actions
 
     fun executeAction(action: TargetedAction) {
         actionList.add(action)
-        for (world in possibleRolesWorlds) {
+        for (world in possibleRoleWorlds) {
             world.applyAction(action)
         }
-        possibleRolesWorlds = possibleRolesWorlds.filter { it.worldIsPossible }
+        possibleRoleWorlds = possibleRoleWorlds.filter { it.worldIsPossible }
     }
 
-    fun lynchPlayer(player: String): String {
-        val role = possibleRolesWorlds.filter { it.livingPlayers.contains(player) }.random().roleSet[player]!!
+    /**
+     * Lynches the player [player], updating all worlds accordingly.
+     * Returns the role of the lynched player
+     */
+    fun lynchPlayer(player: String): Role {
+        val role = possibleRoleWorlds.filter { it.livingPlayers.contains(player) }.random().roleSet[player]!!.toRole()
         val action = TargetedAction(action= Action.LYNCH, target=player, targetRole=role)
         executeAction(action)
-        println("$player is executed as $role")
-        return "$player is executed as ${role.name}"
+        return role
     }
 
-    fun seePlayer(performer: String, target: String): String {
+    /**
+     * Handles the death of a player dead in all worlds, 
+     * returning a randomly chose role among all possible worlds
+     */
+    fun quantumKillPlayer(player: String): Role {
+        val role = possibleRoleWorlds.random().roleSet[player]!!.toRole()
+        val action = TargetedAction(action=Action.QUANTUM_DIE,target=player,targetRole=role)
+        executeAction(action)
+        return role
+    }
+
+    /**
+     * 
+     */
+    fun seePlayer(performer: String, target: String): Role? {
         val worldsWithLivingSeer =
-            possibleRolesWorlds.filter {
-                it.livingPlayers.contains(performer) && it.roleSet[performer] == Role.SEER
+            possibleRoleWorlds.filter {
+                it.livingPlayers.contains(performer) && it.roleSet[performer] == Role.SEER.name
             }
         val worldsWithLivingTarget =
             worldsWithLivingSeer.filter { it.livingPlayers.contains(target) }
-        if (worldsWithLivingTarget.isNotEmpty()) {
-            val role = worldsWithLivingTarget.random().roleSet[target]!!
-//            println("Seer $performer sees $target as $role")
+        return if (worldsWithLivingTarget.isNotEmpty()) {
+            val role = worldsWithLivingTarget.random().roleSet[target]!!.toRole().getRoleSeenAs()
             val action = TargetedAction(performer=performer, action= Action.SEE, target=target, targetRole=role)
             executeAction(action)
-            return "Seer $performer sees $target as ${role.name}"
+            role
         } else {
-//            println("Seer $performer sees $target as dead")
             val action = TargetedAction(performer=performer, action= Action.SEE, target=target, targetRole=null)
             executeAction(action)
-            return "Seer $performer sees $target as dead"
+            null
+        }
+    }
+
+    fun oldSeePlayer(performer: String, target: String): Team? {
+        val worldsWithLivingSeer =
+            possibleRoleWorlds.filter {
+                it.livingPlayers.contains(performer) && it.roleSet[performer] == Role.OLD_SEER.name
+            }
+        val worldsWithLivingTarget =
+            worldsWithLivingSeer.filter { it.livingPlayers.contains(target) }
+        return if (worldsWithLivingTarget.isNotEmpty()) {
+            val team = worldsWithLivingTarget.random().roleSet[target]!!.toRole().getRoleSeenAs().team
+            val action = TargetedAction(performer=performer, action= Action.OLDSEE, target=target, targetTeam=team)
+            executeAction(action)
+            team
+        } else {
+            val action = TargetedAction(performer=performer, action= Action.OLDSEE, target=target, targetTeam=null)
+            executeAction(action)
+            null
         }
     }
 
     fun endNight() = executeAction(TargetedAction(action = Action.FINISH_NIGHT))
-}
-
-fun roleSetToFile(roleSet: RoleSet, fileName: String) {
-    val json = Json.encodeToString(roleSet)
-    File(fileName).writeText(json)
-}
-
-fun roleSetFromFile(fileName: String): RoleSet {
-    val json = File(fileName).readText()
-    return Json.decodeFromString(json)
+    
+    // endregion
+    
+    fun getWinningTeam(): Team? {
+        val worldCount = possibleRoleWorlds.size
+        val worldCountByTeam = possibleRoleWorlds.groupingBy { it.getWinningTeam() }.eachCount()
+        val winningTeam = worldCountByTeam.maxByOrNull { it.value }?.key
+        return if (winningTeam != null && worldCountByTeam[winningTeam] == worldCount) winningTeam 
+        else null
+    }
 }

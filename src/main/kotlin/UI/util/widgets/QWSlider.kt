@@ -1,26 +1,29 @@
-package UI.util
+package UI.util.widgets
 
 // Adapted from unciv, the Civ-V clone by Yairm210
 
+import Constants
+import UI.util.BaseScreen
+import UI.util.onClick
+import UI.util.surroundWithCircle
+import UI.util.toLabel
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.math.Interpolation
+import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.scenes.scene2d.Actor
 import com.badlogic.gdx.scenes.scene2d.EventListener
 import com.badlogic.gdx.scenes.scene2d.Group
 import com.badlogic.gdx.scenes.scene2d.Touchable
 import com.badlogic.gdx.scenes.scene2d.actions.Actions
-import com.badlogic.gdx.scenes.scene2d.ui.Container
-import com.badlogic.gdx.scenes.scene2d.ui.Label
-import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane
-import com.badlogic.gdx.scenes.scene2d.ui.Slider
-import com.badlogic.gdx.scenes.scene2d.ui.Table
+import com.badlogic.gdx.scenes.scene2d.ui.*
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener
 import com.badlogic.gdx.utils.Align
 import com.badlogic.gdx.utils.Timer
 import kotlin.math.abs
+import kotlin.math.log2
 import kotlin.math.sign
 
 /**
@@ -40,31 +43,41 @@ import kotlin.math.sign
  * @param plusMinus     Enable +/- buttons
  * @param onChange      Optional lambda gets called with the current value on change
  */
-class QWSlider (
+class QWSlider(
     min: Float,
     max: Float,
     step: Float,
     vertical: Boolean = false,
     plusMinus: Boolean = true,
     initial: Float,
+    logarithmic: Boolean = false,
     private val getTipText: ((Float) -> String)? = null,
-    onChange: ((Float) -> Unit)? = null
-): Table(BaseScreen.skin) {
+    onChange: ((Float) -> Unit)? = null,
+) : Table(BaseScreen.skin) {
     companion object {
         /** Can be passed directly to the [getTipText] constructor parameter */
         fun formatPercent(value: Float): String {
             return (value * 100f + 0.5f).toInt().toString() + "%"
         }
+
         // constants for geometry tuning
         const val plusMinusFontSize = Constants.defaultFontSize
         const val plusMinusCircleSize = 20f
-        const val padding = 5f                  // padding around the Slider, doubled between it and +/- buttons
+        const val padding =
+            5f                  // padding around the Slider, doubled between it and +/- buttons
         const val hideDelay = 3f                // delay in s to hide tooltip
         const val tipAnimationDuration = 0.2f   // tip show/hide duration in s
     }
 
     // component widgets
-    private val slider = Slider(min, max, step, vertical, BaseScreen.skin)
+    private val slider =
+        if (logarithmic) LogarithmicSlider(min, max, step, vertical, BaseScreen.skin) else Slider(
+            min,
+            max,
+            step,
+            vertical,
+            BaseScreen.skin
+        )
     private val minusButton: IconCircleGroup?
     private val plusButton: IconCircleGroup?
     private val tipLabel = "".toLabel(Color.LIGHT_GRAY)
@@ -78,6 +91,7 @@ class QWSlider (
     // Compatibility with default Slider
     val minValue: Float
         get() = slider.minValue
+
     @Suppress("unused") // Part of the Slider API
     val maxValue: Float
         get() = slider.maxValue
@@ -93,10 +107,12 @@ class QWSlider (
             slider.stepSize = value
             stepChanged()
         }
+
     /** Returns true if the slider is being dragged. */
     @Suppress("unused") // Part of the Slider API
     val isDragging: Boolean
         get() = slider.isDragging
+
     /** Disables the slider - visually (if the skin supports it) and blocks interaction */
     var isDisabled: Boolean
         get() = slider.isDisabled
@@ -104,11 +120,13 @@ class QWSlider (
             slider.isDisabled = value
             setPlusMinusEnabled()
         }
+
     /** Sets the range of this slider. The slider's current value is clamped to the range. */
     fun setRange(min: Float, max: Float) {
         slider.setRange(min, max)
         setPlusMinusEnabled()
     }
+
     /** Will make this slider snap to the specified values, if the knob is within the threshold. */
     fun setSnapToValues(values: FloatArray?, threshold: Float) {
         snapToValues = values       // make a copy so our plus/minus code can snap
@@ -185,9 +203,6 @@ class QWSlider (
 
     // Helper for plus/minus button onClick, non-trivial only if setSnapToValues is used
     private fun addToValue(delta: Float) {
-        // un-snapping with Shift is taken from Slider source, and the loop mostly as well
-        // with snap active, plus/minus buttons will go to the next snap position regardless of stepSize
-        // this could be shorter if Slider.snap(), Slider.snapValues and Slider.threshold weren't protected
         if (snapToValues?.isEmpty() != false ||
             Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT) ||
             Gdx.input.isKeyPressed(Input.Keys.SHIFT_RIGHT)
@@ -195,20 +210,12 @@ class QWSlider (
             value += delta
             return
         }
-        var bestDiff = -1f
-        var bestIndex = -1
-        for ((i, snapValue) in snapToValues!!.withIndex()) {
-            val diff = abs(value - snapValue)
-            if (diff <= snapThreshold) {
-                if (bestIndex == -1 || diff < bestDiff) {
-                    bestDiff = diff
-                    bestIndex = i
-                }
-            }
-        }
-        bestIndex += delta.sign.toInt()
-        if (bestIndex !in snapToValues!!.indices) return
-        value = snapToValues!![bestIndex]
+        val newValue = if (delta > 0)
+            snapToValues!!.firstOrNull { it > value } ?: return
+        else
+            snapToValues!!.lastOrNull { it < value } ?: return
+        
+        value = newValue
     }
 
     // Visual feedback
@@ -227,11 +234,11 @@ class QWSlider (
 
     private fun setPlusMinusEnabled() {
         val enableMinus = slider.value > slider.minValue && !isDisabled
-        minusButton?.touchable = if(enableMinus) Touchable.enabled else Touchable.disabled
-        minusButton?.apply {circle.color.a = if(enableMinus) 1f else 0.5f}
+        minusButton?.touchable = if (enableMinus) Touchable.enabled else Touchable.disabled
+        minusButton?.apply { circle.color.a = if (enableMinus) 1f else 0.5f }
         val enablePlus = slider.value < slider.maxValue && !isDisabled
-        plusButton?.touchable = if(enablePlus) Touchable.enabled else Touchable.disabled
-        plusButton?.apply {circle.color.a = if(enablePlus) 1f else 0.5f}
+        plusButton?.touchable = if (enablePlus) Touchable.enabled else Touchable.disabled
+        plusButton?.apply { circle.color.a = if (enablePlus) 1f else 0.5f }
     }
 
     private fun stepChanged() {
@@ -312,3 +319,23 @@ class QWSlider (
         )
     }
 }
+
+
+class LogarithmicSlider(
+    min: Float, max: Float, stepSize: Float, vertical: Boolean, skin: Skin?
+) : Slider(min, max, stepSize, vertical, skin) {
+    @Suppress("ClassName")
+    private object exp10OutInverse : Interpolation() {
+        override fun apply(a: Float): Float {
+            if (a < MathUtils.FLOAT_ROUNDING_ERROR) return 0f
+            if (a > 1 - MathUtils.FLOAT_ROUNDING_ERROR) return 1f
+            return -0.1f * log2(1f - a)
+        }
+    }
+
+    init {
+        setVisualInterpolation(Interpolation.exp10Out)
+        setVisualInterpolationInverse(exp10OutInverse)
+    }
+}
+

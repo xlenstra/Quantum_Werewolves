@@ -1,8 +1,9 @@
-package UI.util
+package UI.util.widgets
 // Adapted from Unciv, the civ-V clone, by yairm210
 
 
 import UI.popup.Popup
+import UI.util.*
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.scenes.scene2d.*
 import com.badlogic.gdx.scenes.scene2d.ui.*
@@ -58,7 +59,14 @@ open class TabbedPager(
         private set
 
     private val header = Table(BaseScreen.skin)
-    private val headerScroll = LinkedScrollPane(horizontalOnly = true, header)
+    val leftHeaderElements = Table(BaseScreen.skin)
+    val rightHeaderElements = Table(BaseScreen.skin)
+    private val fullHeader = Table(BaseScreen.skin).apply {
+        add(leftHeaderElements).left().expandX()
+        add(header).center() 
+        add(rightHeaderElements).right().expandX()
+    }
+    private val headerScroll = LinkedScrollPane(horizontalOnly = true, fullHeader)
     protected var headerHeight = 0f
 
     private val fixedContentScroll = LinkedScrollPane(horizontalOnly = true)
@@ -76,7 +84,7 @@ open class TabbedPager(
      *  [activated] or [deactivated], or to provide [fixed content][getFixedContent] */
     interface IPageExtensions {
         /** Called by [TabbedPager] after a page is shown, whether by user click or programmatically. */
-        fun activated(index: Int, caption: String, pager: TabbedPager)
+        fun activated(index: Int, caption: String, pager: TabbedPager) {}
 
         /** Called by [TabbedPager] before a page is hidden, whether by user click or programmatically. */
         fun deactivated(index: Int, caption: String, pager: TabbedPager) {}
@@ -284,7 +292,7 @@ open class TabbedPager(
             addSeparator(separatorColor)
 
         fixedContentScrollCell = add(fixedContentScroll)
-        fixedContentScrollCell.growX().row()
+        fixedContentScrollCell.grow().row()
         add(contentScroll).grow().row()
     }
 
@@ -617,5 +625,19 @@ open class TabbedPager(
             val page = deferredSecretPages.removeFirstOrNull() ?: return
             addAndShowPage(page, -1)
         }
+    }
+}
+
+
+
+
+
+class NonScrollablePage(private val subScreen: Table) : Table(), TabbedPager.IPageExtensions {
+    override fun getFixedContent(): Actor {
+        return subScreen
+    }
+
+    override fun activated(index: Int, caption: String, pager: TabbedPager) {
+        
     }
 }

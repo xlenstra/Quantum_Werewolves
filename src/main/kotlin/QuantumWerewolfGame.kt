@@ -7,6 +7,7 @@ import UI.screens.MainMenuScreen
 import UI.skin.SkinCache
 import UI.util.*
 import UI.popup.ConfirmPopup
+import UI.screens.GameScreen
 import UI.wrapCrashHandlingUnit
 import com.badlogic.gdx.Game
 import com.badlogic.gdx.Gdx
@@ -30,6 +31,9 @@ class QuantumWerewolfGame(val parameters: QWParameters) : Game() {
     /** A wrapped render() method that crashes to [CrashScreen] on a unhandled exception or error. */
     private val wrappedCrashHandlingRender = { super.render() }.wrapCrashHandlingUnit()
 
+    var gameScreen: GameScreen? = null
+        private set
+    
     var isInitialized = false
 
     /** A wrapped render() method that crashes to [CrashScreen] on a unhandled exception or error. */
@@ -79,7 +83,7 @@ class QuantumWerewolfGame(val parameters: QWParameters) : Game() {
 //                ImageGetter.ruleset = vanillaRuleset // so that we can enter the map editor without having to load a game first
 
 
-                setAsRootScreen(MainMenuScreen(this@QuantumWerewolfGame))
+                setAsRootScreen(MainMenuScreen())
 //                when {
 //                    settings.isFreshlyCreated -> setAsRootScreen(LanguagePickerScreen())
 //                    deepLinkedMultiplayerGame == null ->
@@ -100,7 +104,7 @@ class QuantumWerewolfGame(val parameters: QWParameters) : Game() {
      *
      * Sets the returned `WorldScreen` as the only active screen.
      */
-    suspend fun loadGame(newGameInfo: GameInfo)/*: WorldScreen = withThreadPoolContext toplevel@*/{
+    suspend fun loadGame(newGameInfo: GameInfo): GameScreen = withThreadPoolContext toplevel@ {
         val prevGameInfo = gameInfo
         gameInfo = newGameInfo
 
@@ -108,38 +112,20 @@ class QuantumWerewolfGame(val parameters: QWParameters) : Game() {
 
 //        val isLoadingSameGame = worldScreen != null && prevGameInfo != null && prevGameInfo.gameId == newGameInfo.gameId
 //        val worldScreenRestoreState = if (isLoadingSameGame) worldScreen!!.getRestoreState() else null
-//
-//        lateinit var loadingScreen: LoadingScreen
 
-//        withGLContext {
-//            // this is not merged with the below GL context block so that our loading screen gets a chance to show - otherwise
-//            // we do it all in one swoop on the same thread and the application just "freezes" without loading screen for the duration.
-//            loadingScreen = LoadingScreen(getScreen())
-//            setScreen(loadingScreen)
-//        }
+        return@toplevel withGLContext {
+            for (screen in screenStack) screen.dispose()
+            screenStack.clear()
 
-//        return@toplevel withGLContext {
-//            for (screen in screenStack) screen.dispose()
-//            screenStack.clear()
-//
-//            worldScreen = null // This allows the GC to collect our old WorldScreen, otherwise we keep two WorldScreens in memory.
-//            val newWorldScreen = WorldScreen(newGameInfo, newGameInfo.getPlayerToViewAs(), worldScreenRestoreState)
-//            worldScreen = newWorldScreen
-//
-//            val moreThanOnePlayer = newGameInfo.civilizations.count { it.playerType == PlayerType.Human } > 1
-//            val isSingleplayer = !newGameInfo.gameParameters.isOnlineMultiplayer
-//            val screenToShow = if (moreThanOnePlayer && isSingleplayer) {
-//                PlayerReadyScreen(newWorldScreen)
-//            } else {
-//                newWorldScreen
-//            }
-//
-//            screenStack.addLast(screenToShow)
-//            setScreen(screenToShow)
-//            loadingScreen.dispose()
-//
-//            return@withGLContext newWorldScreen
-//        }
+            gameScreen = null // This allows the GC to collect our old WorldScreen, otherwise we keep two WorldScreens in memory.
+            val newGameScreen = GameScreen(newGameInfo)
+            gameScreen = newGameScreen
+
+            screenStack.addLast(newGameScreen)
+            setScreen(newGameScreen)
+
+            return@withGLContext newGameScreen
+        }
     }
 
     /**
@@ -210,7 +196,16 @@ class QuantumWerewolfGame(val parameters: QWParameters) : Game() {
         oldScreen.dispose()
     }
 
+    /** Resets the game to the stored game screen and automatically [disposes][Screen.dispose] all other screens. */
+    fun resetToGameScreen(): GameScreen {
+        for (screen in screenStack.filter { it !is GameScreen}) screen.dispose()
+        screenStack.removeAll { it !is GameScreen }
+        val worldScreen = screenStack.last() as GameScreen
 
+        setScreen(worldScreen)
+        return worldScreen
+    }
+    
     // This is ALWAYS called after create() on Android - google "Android life cycle"
     override fun resume() {
         super.resume()
@@ -219,6 +214,7 @@ class QuantumWerewolfGame(val parameters: QWParameters) : Game() {
 
     override fun pause() {
         val curGameInfo = gameInfo
+        if (curGameInfo != null) files.requestAutoSave(curGameInfo)
         super.pause()
     }
 
@@ -231,6 +227,19 @@ class QuantumWerewolfGame(val parameters: QWParameters) : Game() {
     override fun dispose() {
         Gdx.input.inputProcessor = null // don't allow ANRs when shutting down, that's silly
 
+        val curGameInfo = gameInfo
+        if (curGameInfo != null) {
+            val autoSaveJob = files.autoSaveJob
+            if (autoSaveJob != null && autoSaveJob.isActive) {
+                // auto save is already in progress (e.g. started by onPause() event)
+                // let's allow it to finish and do not try to autosave second time
+                Concurrency.runBlocking {
+                    autoSaveJob.join()
+                }
+            } else {
+                files.autoSave(curGameInfo)      // NO new thread
+            }
+        }
         settings.save()
         Concurrency.stopThreadPools()
 
@@ -268,15 +277,15 @@ class QuantumWerewolfGame(val parameters: QWParameters) : Game() {
 //        }
     }
 
-//    fun goToMainMenu(): MainMenuScreen {
-//        val curGameInfo = gameInfo
-//        if (curGameInfo != null) {
-//            files.requestAutoSaveUnCloned(curGameInfo) // Can save gameInfo directly because the user can't modify it on the MainMenuScreen
-//        }
-//        val mainMenuScreen = MainMenuScreen()
-//        pushScreen(mainMenuScreen)
-//        return mainMenuScreen
-//    }
+    fun goToMainMenu(): MainMenuScreen {
+        val curGameInfo = gameInfo
+        if (curGameInfo != null) {
+            files.requestAutoSaveUnCloned(curGameInfo) // Can save gameInfo directly because the user can't modify it on the MainMenuScreen
+        }
+        val mainMenuScreen = MainMenuScreen()
+        pushScreen(mainMenuScreen)
+        return mainMenuScreen
+    }
 
     companion object {
         lateinit var Current: QuantumWerewolfGame

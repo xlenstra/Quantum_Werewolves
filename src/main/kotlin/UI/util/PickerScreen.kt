@@ -1,7 +1,7 @@
-package UI.screens
+package UI.util
 
 import UI.util.BaseScreen
-import UI.util.PickerPane
+import UI.util.widgets.PickerPane
 import UI.util.onActivation
 
 open class PickerScreen(disableScroll: Boolean = false) : BaseScreen() {

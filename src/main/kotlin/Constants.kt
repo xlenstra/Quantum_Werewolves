@@ -4,8 +4,11 @@ object Constants {
     val minPlayerCount = 5
     val maxPlayerCount = 35
 
-    val close: String = "Close"
-    val OK: String = "OK"
+    const val OK = "OK"
+    const val close = "Close"
+    const val yes = "Yes"
+    const val no = "No"
+    const val loading = "Loading..."
 
 
     const val defaultFontSize = 18

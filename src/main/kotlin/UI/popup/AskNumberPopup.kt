@@ -3,6 +3,8 @@ package com.unciv.ui.popup
 import UI.images.ImageGetter
 import UI.popup.Popup
 import UI.util.*
+import UI.util.widgets.IconCircleGroup
+import UI.util.widgets.UncivTextField
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.scenes.scene2d.ui.Button
 import com.badlogic.gdx.scenes.scene2d.ui.Table

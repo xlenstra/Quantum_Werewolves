@@ -1,4 +1,4 @@
-package UI.util
+package UI.util.widgets
 // Adapted from Unciv, the civ-V clone, by yairm210
 
 import com.badlogic.gdx.scenes.scene2d.Actor

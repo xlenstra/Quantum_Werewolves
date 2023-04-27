@@ -4,6 +4,7 @@ package UI.util
 import QuantumWerewolfGame
 import UI.images.ImageGetter
 import UI.skin.SkinStrings
+import UI.util.widgets.QWStage
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Screen
 import com.badlogic.gdx.graphics.Color

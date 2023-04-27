@@ -3,6 +3,7 @@ package UI.util
 
 
 import UI.images.ImageGetter
+import UI.util.widgets.IconCircleGroup
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.math.Rectangle
 import com.badlogic.gdx.math.Vector2
