@@ -187,6 +187,7 @@ class World() {
         // Add passive role actions
         for (player in livingPlayers) {
             if (roleSet[player] == Role.HAMSTER.name) {
+                if (worldNightActions.getBlessedCursed(player) < 0) continue
                 worldNightActions.guardedPlayers.add(player)
                 worldNightActions.hamsterPlayers.add(player)
             }
