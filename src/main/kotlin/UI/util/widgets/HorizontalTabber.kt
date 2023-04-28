@@ -40,7 +40,7 @@ open class HorizontalTabber(
             tabButton.onClick {
                 setInformationTable(tab)
             }
-            optionTable.add(tabButton).pad(10f).row()
+            optionTable.add(tabButton).fillX().pad(10f).row()
         }
     }
     

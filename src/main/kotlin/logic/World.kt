@@ -29,7 +29,7 @@ class World() {
     constructor(roleSet: Map<String, Role>, worldID: Int) : this() {
         this.roleSet = roleSet.mapValues { it.value.name }.toMutableMap()
         this.ID = worldID
-        werewolfOrder = roleSet.filter { it.value == Role.WEREWOLF }.keys.shuffled()
+        werewolfOrder = roleSet.filter { it.value.team == Team.WEREWOLF }.keys.shuffled()
         livingPlayers.clear()
         livingPlayers.addAll(roleSet.keys.toMutableList())
     }
@@ -72,7 +72,7 @@ class World() {
         if (action.action == Action.QUANTUM_DIE) return true
         if (action.action == Action.FINISH_NIGHT) return true
         if (action.performer !in livingPlayers) return false
-        return action.action!!.performingRole!!.name == roleSet[action.performer]!!
+        return roleSet[action.performer]!!.toRole().hasAction(action.action!!)
     }
 
     fun applyAction(action: TargetedAction) {
@@ -84,7 +84,7 @@ class World() {
                 if (roleSet[action.target] != action.targetRole!!.name) {
                     worldIsPossible = false
                 }
-                killAndHandleDeath(action.target!!, true)
+                killAndHandleDeath(action.target!!)
             }
             Action.QUANTUM_DIE -> {
                 if (roleSet[action.target] != action.targetRole!!.name) {
@@ -96,46 +96,71 @@ class World() {
                 worldNightActions.wolfTargets[action.performer!!] = action.target
             }
             Action.SEE -> {
-                // If the target is already dead, we don't need to do anything here
                 if (action.targetRole == null) return
+                if (action.target == null) return
+                if (action.target !in livingPlayers) return
+                if (worldNightActions.getBlessedCursed(action.performer!!) < 0) return
                 if (roleSet[action.target]!!.toRole().getRoleSeenAs() != action.targetRole) {
                     worldIsPossible = false
                 }
-                if (action.targetRole == Role.HAMSTER) {
-                    killAndHandleDeath(action.target!!)
-                }
+                worldNightActions.seenPlayers.add(action.target)
             }
             Action.OLDSEE -> {
                 if (action.targetTeam == null) return
                 if (action.target == null) return
-                if (roleSet[action.target]!!.toRole().getRoleSeenAs().team != action.targetTeam) {
+                if (action.target !in livingPlayers) return
+                if (worldNightActions.getBlessedCursed(action.performer!!) < 0) return
+                if (roleSet[action.target]!!.toRole().getTeamOldSeenAs() != action.targetTeam) {
                     worldIsPossible = false
                 }
-                if (roleSet[action.target]!! == Role.HAMSTER.name) {
-                    killAndHandleDeath(action.target)
-                }
+                worldNightActions.seenPlayers.add(action.target)
+            }
+            Action.BLESSES -> {
+                if (action.target == null) return
+                if (action.target !in livingPlayers) return
+                worldNightActions.blessedCursedPlayers[action.target] = worldNightActions.getBlessedCursed(action.performer!!) + 1
+            }
+            Action.CURSES -> {
+                if (action.target == null) return
+                if (action.target !in livingPlayers) return
+                worldNightActions.blessedCursedPlayers[action.target] = worldNightActions.getBlessedCursed(action.performer!!) - 1
+            }
+            Action.MAKE_HAMSTER -> {
+                if (action.target == null) return
+                if (action.target !in livingPlayers) return
+                if (worldNightActions.getBlessedCursed(action.performer!!) < 0) return
+                worldNightActions.hamsterPlayers.add(action.target)
+                worldNightActions.guardedPlayers.add(action.target)
             }
             Action.GUARD -> {
                 if (action.target == null) return
+                if (action.target !in livingPlayers) return
+                if (worldNightActions.getBlessedCursed(action.performer!!) < 0) return
                 worldNightActions.guardedPlayers.add(action.target)
             }
             Action.SLUTS -> {
                 if (action.target == null) return
                 if (action.target !in livingPlayers) return
-                worldNightActions.guardedPlayers.add(action.performer!!)
+                if (worldNightActions.getBlessedCursed(action.performer!!) < 0) return
+                worldNightActions.guardedPlayers.add(action.performer)
                 worldNightActions.sleepsAt[action.performer] = action.target
+            }
+            Action.INVITES -> {
+                if (action.target == null) return
+                if (action.target !in livingPlayers) return
+                if (worldNightActions.getBlessedCursed(action.performer!!) < 0) return
+                worldNightActions.guardedPlayers.add(action.target)
+                worldNightActions.sleepsAt[action.target] = action.performer
             }
             Action.POISONS -> {
                 if (action.target == null) return
-                if (action.target !in livingPlayers) {
-                    worldIsPossible = false
-                    return
-                }
-                killAndHandleDeath(action.target, true)
+                if (worldNightActions.getBlessedCursed(action.performer!!) < 0) return
+                worldNightActions.playersThatDiedTonight.add(action.target)
             }
             Action.SHOOT -> {
                 if (action.target == null) return
-                worldNightActions.mutualKills[action.performer!!] = action.target
+                if (worldNightActions.getBlessedCursed(action.performer!!) < 0) return
+                worldNightActions.mutualKills[action.performer] = action.target
             }
             Action.CHOOSE_EXAMPLE -> {
                 if (action.target == null) return
@@ -153,40 +178,73 @@ class World() {
                 }
             }
             Action.FINISH_NIGHT -> {
-                for (player in livingPlayers) {
-                    if (roleSet[player] == Role.HAMSTER.name) {
-                        worldNightActions.guardedPlayers.add(player)
-                    }
-                }
-                val killWolf = werewolfOrder.firstOrNull {
-                    val target = worldNightActions.wolfTargets[it]
-                    it in livingPlayers
-                    && target in livingPlayers
-                    && roleSet.getOrDefault(target, null) != Role.WEREWOLF.name
-                }
-                val wolfTarget = worldNightActions.wolfTargets[killWolf]
-                
-                if (wolfTarget != null) {
-                    if (wolfTarget !in worldNightActions.guardedPlayers)
-                        killAndHandleDeath(wolfTarget)
-                    for ((guest, house) in worldNightActions.sleepsAt) {
-                        if (house == wolfTarget) {
-                            killAndHandleDeath(guest)
-                        }
-                    }
-                }
-                for ((killed, target) in worldNightActions.mutualKills) {
-                    if (killed !in livingPlayers) { // Killed this night
-                        killAndHandleDeath(target, true)
-                    }
-                }
-                worldNightActions.reset()
+                finishNight()
             }
         }
     }
     
-    private fun killAndHandleDeath(player: String, dropWorldIfDead: Boolean = false) {
-        if (dropWorldIfDead && player !in livingPlayers) {
+    private fun finishNight() {
+        // Add passive role actions
+        for (player in livingPlayers) {
+            if (roleSet[player] == Role.HAMSTER.name) {
+                worldNightActions.guardedPlayers.add(player)
+                worldNightActions.hamsterPlayers.add(player)
+            }
+        }
+
+        // Seen hamsters die
+        for (player in worldNightActions.seenPlayers) {
+            if (player in worldNightActions.hamsterPlayers) {
+                worldNightActions.playersThatDiedTonight.add(player)
+            }
+        }
+
+        // Wolves kill
+        val killWolf = werewolfOrder.firstOrNull { wolf ->
+            val target = worldNightActions.wolfTargets[wolf]
+
+            wolf in livingPlayers
+            && target != null
+            && target in livingPlayers
+            && roleSet[target]!!.toRole().canBeEaten()
+        }
+        val wolfTarget = worldNightActions.wolfTargets[killWolf]
+        if (wolfTarget != null && worldNightActions.getBlessedCursed(killWolf!!) <= 0) {
+            if (wolfTarget !in worldNightActions.guardedPlayers)
+                worldNightActions.playersThatDiedTonight.add(wolfTarget)
+            for ((guest, house) in worldNightActions.sleepsAt) {
+                if (house == wolfTarget) {
+                    worldNightActions.playersThatDiedTonight.add(guest)
+                }
+            }
+        }
+
+        fun hunterKill(hunter: String) {
+            val target = worldNightActions.mutualKills[hunter] ?: return
+            worldNightActions.playersThatDiedTonight.add(target)
+            if (roleSet[target]!!.toRole().hasAction(Action.SHOOT)) {
+                hunterKill(target)
+            }
+        }
+
+        // Hunters shoot recursively if they died
+        for ((killed, target) in worldNightActions.mutualKills) {
+            if (roleSet[killed]!!.toRole().hasAction(Action.SHOOT)) {
+                hunterKill(target)
+            }
+        }
+
+        // Kill all players that died tonight
+        for (player in worldNightActions.playersThatDiedTonight) {
+            killAndHandleDeath(player)
+        }
+
+        worldNightActions.reset()
+    }
+    
+    private fun killAndHandleDeath(player: String) {
+        // Players can't die twice
+        if (player !in livingPlayers) {
             worldIsPossible = false
         }
         val role = roleSet[player]!!.toRole()

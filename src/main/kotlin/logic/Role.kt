@@ -5,41 +5,84 @@ enum class Team(val displayName: String) {
     WEREWOLF("Wolf");
 }
 
-enum class Role(val displayName: String, val team: Team) {
-    VILLAGER("Burger", Team.VILLAGER),
-    VILLAGING_VILLAGER("Burgerlijkste Burger", Team.VILLAGER),
-    EARLY_BIRD("Earlybird", Team.VILLAGER),
-    LYCA("Lycanthroop", Team.VILLAGER),
-    GUARDIAN("Beschermengel", Team.VILLAGER),
-    SLUT("Slet", Team.VILLAGER),
-    HAMSTER("Weerhamster", Team.VILLAGER),
-    SEER("Ziener", Team.VILLAGER),
-    OLD_SEER("Oude Ziener", Team.VILLAGER),
-    APPRENTICE_SEER("Leerlingziener", Team.VILLAGER),
-    WITCH("Heks", Team.VILLAGER),
-    HUNTER("Jager", Team.VILLAGER),
-    WEREWOLF("Weerwolf", Team.WEREWOLF),
-    SMALL_WILD_ONE("Kleine Wilde", Team.VILLAGER),
-    DEVIL("Duivel", Team.VILLAGER),
+enum class Role(val displayName: String) {
+    // Team Villager
+    GUARDIAN("Beschermengel"),
+    HAMSTER_MANIAC("Behamsteraar"),
+    VILLAGER("Burger"),
+    VILLAGING_VILLAGER("Burgerlijkste Burger"),
+    CASANOVA("Casanova"),
+    EARLY_BIRD("Earlybird"),
+    FRAUDSTER("Frauduer"),
+    BLESSED("Gezegende"),
+    WITCH("Heks"),
+    HUNTER("Jager"),
+    APPRENTICE_SEER("Leerlingziener"),
+    LYCA("Lycanthroop"),
+    OLD_SEER("Oude Ziener"),
+    SLUT("Slet"),
+    HAMSTER("Weerhamster"),
+    SEER("Ziener"),
+    
+    // Team Wolf
+    WEREWOLF("Weerwolf"),
+    CURSED("Vervloekte"),
+    
+    // Other teams or team switchers
+    SMALL_WILD_ONE("Kleine Wilde"),
+    DEVIL("Duivel"),
     ;
+    
+    val actions by lazy { mapToActions() }
+    val team by lazy {
+        when (this) {
+            WEREWOLF, CURSED -> Team.WEREWOLF
+            else -> Team.VILLAGER
+        }
+    }
 
-    fun mapToActions(): Set<Action> {
+    
+    
+    private fun mapToActions(): Set<Action> {
         return when (this) {
-            WEREWOLF -> setOf(Action.EAT)
-            SEER -> setOf(Action.SEE)
-            OLD_SEER -> setOf(Action.OLDSEE)
             GUARDIAN -> setOf(Action.GUARD)
-            SLUT -> setOf(Action.SLUTS)
+            HAMSTER_MANIAC -> setOf(Action.MAKE_HAMSTER)
+            BLESSED -> setOf(Action.BLESSES)
+            CASANOVA -> setOf(Action.INVITES)
             WITCH -> setOf(Action.POISONS)
             HUNTER -> setOf(Action.SHOOT)
+            OLD_SEER -> setOf(Action.OLDSEE)
+            SLUT -> setOf(Action.SLUTS)
+            SEER -> setOf(Action.SEE)
+            WEREWOLF -> setOf(Action.EAT)
+            CURSED -> setOf(Action.CURSES)
             SMALL_WILD_ONE -> setOf(Action.CHOOSE_EXAMPLE)
             DEVIL -> setOf(Action.DEVILS_CHOICE)
             else -> setOf()
         }
     }
     
+    fun hasAction(action: Action): Boolean {
+        return actions.contains(action)
+    }
+    
     fun getRoleSeenAs(): Role {
-        return if (this == LYCA) WEREWOLF
-        else this
-    } 
+        return when (this) {
+            LYCA -> WEREWOLF
+            CURSED -> VILLAGER
+            else -> this
+        }
+    }
+    
+    fun getTeamOldSeenAs(): Team {
+        return when (this) {
+            LYCA -> Team.WEREWOLF
+            CURSED -> Team.VILLAGER
+            else -> this.team
+        }
+    }
+    
+    fun canBeEaten(): Boolean {
+        return this != WEREWOLF
+    }
 }

@@ -2,3 +2,7 @@
 *gradle*
 /.idea/
 /build/
+/SaveFiles/
+hs_err_pid*.log
+lasterror.txt
+Build Executable Command.txt

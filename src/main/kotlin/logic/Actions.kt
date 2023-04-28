@@ -3,19 +3,23 @@ package logic
 import kotlinx.serialization.Serializable
 
 
-enum class Action(val performingRole: Role?, val displayName: String) {
-    LYNCH(null, "Lynches"),
-    QUANTUM_DIE(null, "Quantum Dies"),
-    FINISH_NIGHT(null, "Finish Night"),
-    EAT(Role.WEREWOLF, "Eats"),
-    SEE(Role.SEER, "Sees"),
-    OLDSEE(Role.OLD_SEER, "Sees"),
-    GUARD(Role.GUARDIAN, "Guards"),
-    SLUTS(Role.SLUT, "Sleeps at"),
-    POISONS(Role.WITCH, "Poisons"),
-    SHOOT(Role.HUNTER, "Shoots"),
-    CHOOSE_EXAMPLE(Role.SMALL_WILD_ONE, "Follows"),
-    DEVILS_CHOICE(Role.DEVIL, "Chooses")
+enum class Action(val displayString: String) {
+    LYNCH( "Is Lynched"),
+    QUANTUM_DIE( "Quantum Dies"),
+    FINISH_NIGHT( "Finish Night"),
+    EAT("Eats"),
+    SEE("Sees"),
+    OLDSEE("Sees"),
+    BLESSES("Blesses"),
+    GUARD("Guards"),
+    INVITES("Invites"),
+    SLUTS("Sleeps at"),
+    MAKE_HAMSTER("Transforms into a Hamster"),
+    POISONS("Poisons"),
+    SHOOT("Shoots"),
+    CHOOSE_EXAMPLE("Follows"),
+    DEVILS_CHOICE("Chooses"),
+    CURSES("Curses"),
 }
 
 @Serializable
@@ -31,20 +35,22 @@ data class TargetedAction(
             Action.LYNCH -> "$target is lynched as ${targetRole!!.displayName}"
             Action.QUANTUM_DIE -> "$target dies due to Quantum Mechanics as ${targetRole!!.displayName}"
             Action.FINISH_NIGHT -> ""
-            Action.EAT, Action.SLUTS, Action.GUARD, Action.POISONS, Action.SHOOT, Action.CHOOSE_EXAMPLE, Action.DEVILS_CHOICE -> 
-                "$performer ${action.displayName.lowercase()} ${target ?: "no one"}"
             Action.SEE -> 
                 if (target == null) {
-                    "$performer ${action.displayName.lowercase()} no one"
+                    "$performer ${action.displayString.lowercase()} no one"
                 } else {
-                    "$performer ${action.displayName.lowercase()} $target as ${targetRole?.displayName ?: "dead"}"
+                    "$performer ${action.displayString.lowercase()} $target as ${targetRole?.displayName ?: "dead"}"
                 }
             Action.OLDSEE -> 
                 if (target == null) {
-                    "$performer ${action.displayName.lowercase()} no one"
+                    "$performer ${action.displayString.lowercase()} no one"
                 } else {
-                    "$performer ${action.displayName.lowercase()} $target as ${targetTeam?.displayName ?: "dead"}"
+                    "$performer ${action.displayString.lowercase()} $target as ${targetTeam?.displayName ?: "dead"}"
                 }
+            Action.MAKE_HAMSTER ->
+                "$performer transforms ${(target ?: "no one")} into a hamster"
+            Action.EAT, Action.SLUTS, Action.GUARD, Action.POISONS, Action.SHOOT, Action.CHOOSE_EXAMPLE, Action.DEVILS_CHOICE, Action.INVITES, Action.BLESSES, Action.CURSES ->
+                "$performer ${action.displayString.lowercase()} ${target ?: "no one"}"
         }
     }
 }
@@ -54,18 +60,42 @@ class WorldNightActions {
     fun reset() {
         killWolf = null
         wolfTargets.clear()
+        
+        seenPlayers.clear()
+        
         guardedPlayers.clear()
+        hamsterPlayers.clear()
         sleepsAt.clear()
+        
         mutualKills.clear()
+        
+        playersThatDiedTonight.clear()
     }
 
     var killWolf: String? = null
-    val guardedPlayers = mutableListOf<String>()
     // Maps werewolves to the player they attack
     val wolfTargets = mutableMapOf<String, String>()
+
+    val seenPlayers = mutableSetOf<String>()
+
+    val blessedCursedPlayers = mutableMapOf<String, Int>()
+    val guardedPlayers = mutableSetOf<String>()
+    val hamsterPlayers = mutableSetOf<String>()
     // Maps people to the house they sleep at
     val sleepsAt = mutableMapOf<String, String>()
+    
     val mutualKills = mutableMapOf<String, String>()
+    
+    val playersThatDiedTonight = mutableSetOf<String>()
+    
+    fun makeHamster(player: String) {
+        hamsterPlayers.add(player)
+        guardedPlayers.add(player)
+    }
+    
+    fun getBlessedCursed(player: String): Int {
+        return blessedCursedPlayers[player] ?: 0
+    }
 }
 
 @Serializable
@@ -90,5 +120,9 @@ class AllNightActions() {
 
     fun getAction(performer: String, action: Action): String? {
         return actions[performer]?.get(action.name)
+    }
+
+    fun removeAction(performer: String, action: Action) {
+        actions[performer]?.remove(action.name)
     }
 }

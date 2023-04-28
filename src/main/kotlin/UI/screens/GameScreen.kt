@@ -13,8 +13,8 @@ import com.badlogic.gdx.graphics.Color
 
 class GameScreen(val gameInfo: GameInfo) : PickerScreen() {
 
-    // -150f is height of the picker screen bottom bar
-    // -75f is determine empirically
+    // -150f is the height of the picker screen bottom bar
+    // -75f is determined empirically
     private val centerAreaHeight = stage.height - 75f - 150f
 
     private val overviewScreen: PeriodOverviewScreen
@@ -108,7 +108,6 @@ class GameScreen(val gameInfo: GameInfo) : PickerScreen() {
         }
         lynchPlayerPopup.open()
     }
-
 
     fun autoSaveThenEnableButton() {
 //        waitingForAutoSave = true

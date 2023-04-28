@@ -2,7 +2,7 @@ package UI.screens
 
 import logic.GameInfo
 import logic.Role
-import logic.RoleSet
+import logic.WorldSet
 import QuantumWerewolfGame
 import UI.popup.Popup
 import UI.util.*
@@ -51,6 +51,7 @@ class NewGameScreen(defaultOptions: GameSetupInfo? = null) : PickerScreen() {
         if (defaultOptions != null) {
             optionsTable.worldCount = defaultOptions.worldCount
             optionsTable.textField.text = defaultOptions.gameName
+            optionsTable.worldSlider.value = defaultOptions.worldCount.toFloat()
             playerTable.players.addAll(defaultOptions.players)
             rolesTable.roles.addAll(defaultOptions.roles)
             playerTable.update()
@@ -62,8 +63,8 @@ class NewGameScreen(defaultOptions: GameSetupInfo? = null) : PickerScreen() {
         pick("Start Game")
         rightSideButton.onClick {
             QuantumWerewolfGame.Current.popScreen()
-            val roleSet = RoleSet(optionsTable.worldCount, playerTable.players, rolesTable.roles)
-            QuantumWerewolfGame.Current.gameInfo = GameInfo(roleSet, optionsTable.textField.text)
+            val worldSet = WorldSet(optionsTable.worldCount, playerTable.players, rolesTable.roles)
+            QuantumWerewolfGame.Current.gameInfo = GameInfo(worldSet, optionsTable.textField.text)
             QuantumWerewolfGame.Current.pushScreen(GameScreen(QuantumWerewolfGame.Current.gameInfo!!))
         }
     }
@@ -82,6 +83,9 @@ private class GameOptionsColumn(): Table() {
 
     var worldCount = 100
     lateinit var textField: TextField
+    val worldSlider = QWSlider(100f, 25000f, 50f, initial = worldCount.toFloat(), logarithmic = true) {
+        worldCount = it.toInt()
+    }
     
     init {
         pad(10f)
@@ -97,13 +101,10 @@ private class GameOptionsColumn(): Table() {
 
     private fun addWorldSlider() {
         add("Amount of worlds:".toLabel()).left().expandX()
-        val slider = QWSlider(100f, 25000f, 50f, initial = worldCount.toFloat(), logarithmic = true) {
-            worldCount = it.toInt()
-        }
-        slider.permanentTip = true
+        worldSlider.permanentTip = true
         val snapValues = floatArrayOf(100f, 500f, 1000f, 1500f, 2500f, 5000f, 7500f, 10000f, 25000f)
-        slider.setSnapToValues(snapValues, 150f)
-        add(slider).padTop(10f).row()
+        worldSlider.setSnapToValues(snapValues, 150f)
+        add(worldSlider).padTop(10f).row()
     }
 }
 

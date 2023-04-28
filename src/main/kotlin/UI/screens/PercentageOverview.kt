@@ -22,10 +22,10 @@ class PercentageOverview(private val gameInfo: GameInfo, private val mainScreen:
     private fun getInformationForPlayer(player: String): Table {
         val informationTable = Table()
         informationTable.add(player.toLabel(fontSize=Constants.headingFontSize)).pad(10f).row()
-        informationTable.add("${100f-100f*gameInfo.roleSet.deathPercentageOfPlayer(player)}% alive".toLabel()).pad(5f).row()
+        informationTable.add("${100f-100f*gameInfo.worldSet.deathPercentageOfPlayer(player)}% alive".toLabel()).pad(5f).row()
         informationTable.addSeparator().pad(10f)
         informationTable.add("Percentages:".toLabel(fontSize=Constants.headingFontSize)).pad(5f).row()
-        val percentages = gameInfo.roleSet.rolePercentagesOfPlayer(player)
+        val percentages = gameInfo.worldSet.rolePercentagesOfPlayer(player)
         for (role in percentages.keys.sorted()) {
             informationTable.add("${role.displayName}: ${100f*percentages[role]!!}%".toLabel()).pad(5f).row()
         }
