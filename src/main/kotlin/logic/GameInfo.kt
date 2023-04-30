@@ -20,6 +20,8 @@ class GameInfo() {
     var isDay = false
 
     lateinit var worldSet: WorldSet
+    
+    private var roleSet: WorldSet? = null
 
     private val witchesWithoutPotion = mutableListOf<String>()
 
@@ -180,6 +182,10 @@ class GameInfo() {
     fun fixBugs() {
         if (!this::gameName.isInitialized) {
             gameName = "Quantum Weerwolven"
+        }
+        if (roleSet != null) {
+            worldSet = roleSet!!
+            roleSet = null
         }
     }
 }
